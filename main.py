@@ -18,7 +18,7 @@ class Printer:
     """Dataclass to store information about a printer."""
 
     hostname: str
-    password: list[int] = field(default_factory=lambda: [101, 0])
+    password: list[int] = field(default_factory=lambda: [85, 5])
     eeprom_link: str = "1.3.6.1.4.1.1248.1.2.2.44.1.1.2.1"
     ink_levels: dict = field(
         default_factory=lambda: {
@@ -30,35 +30,37 @@ class Printer:
     )
     waste_inks: list[dict] = field(
         default_factory=lambda: [
-            {"oids": [20, 21], "total": 19650},
-            {"oids": [22, 23], "total": 5205},
+            {"oids": [24, 25, 30], "multiplicand": 245, "total": 3990},
+            {"oids": [26, 27, 34], "multiplicand": 178, "total": 3255},
         ]
     )
 
-    def __post_init__(self) -> None:
-        """Initialise printer instance."""
-        self.session = Session(printer=self)
 
-    @property
-    def stats(self) -> dict[str, Any]:
-        """Return information about the printer."""
-        methods = [
-            "get_model_full",
-            "get_serial_number",
-            "get_eeps2_version",
-            "get_ink_levels",
-            "get_waste_ink_levels",
-        ]
-        return {
-            method[4:]: self.session.__getattribute__(method)() for method in methods
-        }
+def __post_init__(self) -> None:
+    """Initialise printer instance."""
+    self.session = Session(printer=self)
+
+
+@property
+def stats(self) -> dict[str, Any]:
+    """Return information about the printer."""
+    methods = [
+        "get_model_full",
+        "get_serial_number",
+        "get_eeps2_version",
+        "get_ink_levels",
+        "get_waste_ink_levels",
+    ]
+    return {
+        method[4:]: self.session.__getattribute__(method)() for method in methods
+    }
 
 
 class Session(easysnmp.Session):
     """SNMP session wrapper."""
 
     def __init__(
-        self, printer: Printer, community: str = "public", version: int = 1
+            self, printer: Printer, community: str = "public", version: int = 1
     ) -> None:
         """Initialise session."""
         self.printer = printer
@@ -90,7 +92,7 @@ class Session(easysnmp.Session):
             f".{self.printer.password[1]}"
             ".66.189.33"
             f".{oid}.0.{value}"
-            ".84.98.116.98.111.114.118.98"
+            ".78.118.116.100.98.115.106.47"
         )
 
     def read_eeprom(self, oid: int) -> str:
@@ -154,23 +156,24 @@ class Session(easysnmp.Session):
         results = []
         for waste_ink in self.printer.waste_inks:
             level = self.read_eeprom_many(waste_ink["oids"])
-            level_b10 = int("".join(reversed(level)), 16)
-            results.append(round((level_b10 / waste_ink["total"]) * 100, 2))
+            level_b10 = int("".join(reversed(level[0:2])), 16)
+            if int(level[2], 16) == 0:
+                results.append(
+                    round((level_b10 / waste_ink["total"]) * 100, 2))
+            else:
+                results.append(
+                    round(
+                        ((level_b10 + waste_ink["multiplicand"] * (int(level[2], 16) - 1)) / waste_ink["total"]) * 100,
+                        2))
         return results
 
     def reset_waste_ink_levels(self) -> None:
-        """
-        Set waste ink levels to 0.
-
-        hex(int((80 / 100) * 19650)) == 0x3d68
-        hex(104), hex(61) = (0x68, 0x3d)
-        """
-        data = {20: 0, 21: 0, 22: 0, 23: 0, 24: 0, 25: 0, 59: 0, 60: 94, 61: 94}
+        data = {24: 0, 25: 0, 30: 0, 26: 0, 27: 0, 34: 0, 28: 0, 29: 0, 46: 94, 47: 94, 49: 0}
         for oid, value in data.items():
             self.write_eeprom(oid, value)
 
     def brute_force(
-        self, minimum: int = 0x00, maximum: int = 0xFF
+            self, minimum: int = 0x00, maximum: int = 0xFF
     ) -> Optional[list[int]]:
         """Brute force password for printer."""
         for x, y in itertools.permutations(range(minimum, maximum), r=2):
@@ -195,4 +198,7 @@ if __name__ == "__main__":
         sys.exit(1)
     printer = Printer(args[0])
     session = Session(printer)
+    #session.brute_force()
+    pprint(printer.stats)
+    session.reset_waste_ink_levels()
     pprint(printer.stats)

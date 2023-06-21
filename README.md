@@ -6,9 +6,9 @@ Read information and reset waste ink counters on Epson printers, using SNMP.
 
 ## Description
 
-This project was designed for a EPSON WF-7525 Series printer, but inspired by [projects](#resources) for other models.
-Hopefully, releasing this code will help save a printer from the trash and improve consumer repairability for these devices.
-Feel free to raise an issue for adding support for another model of printer, with logs from `wicreset` or similar attached.
+This project is a fork of [Zedeldi/epson-printer-snmp](https://github.com/Zedeldi/epson-printer-snmp) and modified for EPSON PX-047A Series printer.
+
+If you would like to understand what and why I made modifications, it is advisable to read the original project's readme before reading this.
 
 The format for reading values is:
 
@@ -16,7 +16,7 @@ The format for reading values is:
 
 The format for setting values is:
 
-`{eeprom_link}.124.124.16.0.{password}.66.189.33.{oid}.0.{value}.84.98.116.98.111.114.118.98`
+`{eeprom_link}.124.124.16.0.{password}.66.189.33.{oid}.0.{value}.78.118.116.100.98.115.106.47`
 
 Where `eeprom_link` is consistently `1.3.6.1.4.1.1248.1.2.2.44.1.1.2.1` and `password` is two values, e.g. `101.0`, which seem to vary between different models of printer. This can be found by using a tool, such as `wicreset`, and checking the request it sends.
 A method for brute forcing the password is provided in `Session.brute_force`, which tries to get a value from the EEPROM, for every permutation of `[0x00, 0x00]` to `[0xFF, 0xFF]`.
@@ -27,32 +27,23 @@ Certain values of these formats also vary between models of printer.
 Various methods are defined to get specific information.
 The `Printer.stats` method will return a dictionary of most useful information.
 
-Values for waste ink levels are stored in two addresses, which, when reversed, combine to make a value in hex.
-This value is then divided by a constant, which again seems to vary across models of printer, to make the percentage.
-The constant value can be found by using `wicreset` to read the counters' percentage, getting the hex values of these OIDs, then following the above process to solve:
-e.g.
-```
-# Percentage is 80%.
-# Hex values are (0x68, 0x3d) => 0x3d68
+Check this for [how PX-047A store waste ink levels](https://github.com/Zedeldi/epson-printer-snmp/issues/1#issuecomment-1600061730).
 
-(0x3d68 / 80) * 100 = 19650.0
-```
-Please note that different counters for the same printer may use different constants.
+## Usage
+Edit `password: list[int] = field(default_factory=lambda: [85, 5])` to the password to your printer.
 
+You can find it by using the `session.brute_force()`or checking the log of `wicreset` located at `%appdata%\wicreset\application.log`.
+
+After that, run:
+
+`python3 main.py <printer ip>`
 ## Libraries
 
 - [easysnmp](https://pypi.org/project/easysnmp/) - SNMP
 
 ## Resources
 
-reink-net = <https://github.com/gentu/reink-net>
-  - Used as a starting point to create this Python implementation and translated for different model of printer
-
-epson-l4160-ink-waste-resetter = <https://github.com/nicootto/epson-l4160-ink-waste-resetter>
-
-wicreset = <https://wic-reset.com> / <https://www.2manuals.com> / <https://resetters.com>
-  - The key, `trial`, can be used to reset your counters to 80%. After packet sniffing with `wireshark`, the correct OIDs can be found
-  - This application also stores a log containing SNMP information at `~/.wicreset/application.log`
+If you want to modify this for your own printer, it is recommended to read [Zedeldi/epson-printer-snmp](https://github.com/Zedeldi/epson-printer-snmp).
 
 ## License
 
