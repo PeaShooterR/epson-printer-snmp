@@ -35,25 +35,23 @@ class Printer:
         ]
     )
 
+    def __post_init__(self) -> None:
+        """Initialise printer instance."""
+        self.session = Session(printer=self)
 
-def __post_init__(self) -> None:
-    """Initialise printer instance."""
-    self.session = Session(printer=self)
-
-
-@property
-def stats(self) -> dict[str, Any]:
-    """Return information about the printer."""
-    methods = [
-        "get_model_full",
-        "get_serial_number",
-        "get_eeps2_version",
-        "get_ink_levels",
-        "get_waste_ink_levels",
-    ]
-    return {
-        method[4:]: self.session.__getattribute__(method)() for method in methods
-    }
+    @property
+    def stats(self) -> dict[str, Any]:
+        """Return information about the printer."""
+        methods = [
+            "get_model_full",
+            "get_serial_number",
+            "get_eeps2_version",
+            "get_ink_levels",
+            "get_waste_ink_levels",
+        ]
+        return {
+            method[4:]: self.session.__getattribute__(method)() for method in methods
+        }
 
 
 class Session(easysnmp.Session):
@@ -168,6 +166,12 @@ class Session(easysnmp.Session):
         return results
 
     def reset_waste_ink_levels(self) -> None:
+        """
+        Set waste ink levels to 0.
+
+        hex(int((80 / 100) * 19650)) == 0x3d68
+        hex(104), hex(61) = (0x68, 0x3d)
+        """
         data = {24: 0, 25: 0, 30: 0, 26: 0, 27: 0, 34: 0, 28: 0, 29: 0, 46: 94, 47: 94, 49: 0}
         for oid, value in data.items():
             self.write_eeprom(oid, value)
@@ -198,7 +202,7 @@ if __name__ == "__main__":
         sys.exit(1)
     printer = Printer(args[0])
     session = Session(printer)
-    #session.brute_force()
+    # session.brute_force()
     pprint(printer.stats)
     session.reset_waste_ink_levels()
     pprint(printer.stats)
